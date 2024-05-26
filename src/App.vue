@@ -1,28 +1,16 @@
+<script setup>
+import TheHeader from './components/TheHeader.vue'
+import InterfaceCLI from './components/InterfaceCLI.vue'
+import TheFooter from './components/TheFooter.vue'
+</script>
+
 <template>
-  <div id="app" v-bind:class="{'disconnected': !$store.state.socket.isConnected}">
-    <Header />
+  <div id="app" v-bind:class="{ disconnected: !$store.state.socket.isConnected }">
+    <TheHeader />
     <InterfaceCLI />
-    <Footer />
+    <TheFooter />
   </div>
 </template>
-
-<script>
-import Header from "./components/Header";
-import InterfaceCLI from "./components/InterfaceCLI";
-import Footer from "./components/Footer";
-
-export default {
-  name: "App",
-  data() {
-    return {};
-  },
-  components: {
-    Header,
-    InterfaceCLI,
-    Footer
-  }
-};
-</script>
 
 <style>
 @media only screen and (max-width: 768px) {
@@ -30,14 +18,14 @@ export default {
     font-size: 40px !important;
   }
   #terminal {
-    max-width: 90%!important;
+    max-width: 90% !important;
   }
-  .command{
-    height: 26px!important;
-    font-size: 13px!important;
+  .command {
+    height: 26px !important;
+    font-size: 13px !important;
   }
   button {
-    padding: 0.5em 0.5em!important;
+    padding: 0.5em 0.5em !important;
   }
 }
 
@@ -46,7 +34,7 @@ body {
   padding: 0;
 }
 #app {
-  font-family: "Avenir", Helvetica, Arial, sans-serif;
+  font-family: 'Avenir', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -63,11 +51,11 @@ body {
   background: #505050 !important;
 }
 .disconnected:body {
-  content: "Disconnected"; 
-  font-size: 10em;  
+  content: 'Disconnected';
+  font-size: 10em;
   color: rgba(214, 52, 52, 0.4);
   z-index: 9999;
- 
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,4 +66,3 @@ body {
   left: 0;
 }
 </style>
-

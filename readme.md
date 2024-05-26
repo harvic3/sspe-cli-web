@@ -55,7 +55,7 @@ sspe showme
 - Create a file with seven-segments format
 
 ```console
-sspe create --name theFileName --number 31039064
+sspe create --name theFileName --number 654123
 ```
 
 - List the created files
@@ -67,13 +67,13 @@ sspe list
 - Select a file of list for process
 
 ```console
-sspe select --path Foo.dat
+sspe select --name Foo.dat
 ```
 
 - Add data for train the neural network
 
 ```console
-sspe ml --add 310390 OR sspe m --add auto
+sspe ml --add 654123 OR sspe m --add auto
 ```
 
 - Select a file of list for process with Neural network. File of list from 'sspe list'

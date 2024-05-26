@@ -1,24 +1,29 @@
-import Vue from "vue";
-import App from "./App.vue";
-import store from "./store";
-import VueSocketio from "vue-socket.io-extended";
-import io from "socket.io-client";
+import { createApp } from 'vue'
+import App from './App.vue'
+import store from './store'
+import { io } from 'socket.io-client'
+import VueSocketIO from 'vue-3-socket.io'
 
-Vue.use(VueSocketio, io(store.state.wsUrl, 
-  { transports: [
-      "polling",
-      "websocket"
-    ],
-    path: "/stomp"
-  }).disconnect(),
-  {
-    store: store,
-  }
-);
+const app = createApp(App)
 
-Vue.config.productionTip = store.state.env !== "development" ? true : false;
+const socketInstance = io(store.state.wsUrl, {
+  transports: ['polling', 'websocket'],
+  path: '/stomp',
+  withCredentials: true,
+  autoConnect: false
+})
 
-new Vue({
-  store: store,
-  render: h => h(App)
-}).$mount("#app");
+app.use(
+  new VueSocketIO({
+    debug: true,
+    connection: socketInstance,
+  })
+)
+
+if (store.state.env === 'dev') {
+  app.config.devtools = true
+} else {
+  app.config.devtools = false
+}
+
+app.use(store).mount('#app')

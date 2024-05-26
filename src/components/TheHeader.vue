@@ -1,3 +1,6 @@
+<script setup>
+</script>
+
 <template>
   <div>
     <h1>SSPE Web CLI</h1>
@@ -12,13 +15,6 @@
     </ul>
   </div>
 </template>
-
-<script>
-export default {
-  name: "Header",
-
-};
-</script>
 
 <style scoped>
 h1 {

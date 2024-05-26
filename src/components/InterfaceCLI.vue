@@ -1,11 +1,171 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useStore } from 'vuex'
+import { io } from 'socket.io-client'
+
+const store = useStore()
+
+const socket = io(store.state.wsUrl, {
+  transports: ['polling', 'websocket'],
+  path: '/stomp',
+  withCredentials: true,
+  autoConnect: false
+})
+
+const screenData = ref(null);
+const command = ref(null)
+const lastResponse = ref('')
+const commandHistory = ref([])
+const cursor = ref(0)
+const lastCommand = ref(null)
+const countCommands = ref(0)
+const screenText = ref(null)
+const lastTextHeight = ref(null)
+
+onMounted(() => {
+  connectClient()
+  screenText.value = screenData.value.value
+  lastTextHeight.value = screenText.value.scrollHeight
+})
+
+socket.on('connect', () => {
+  console.log('Client connected')
+  createListener()
+  store.commit('SOCKET_CONNECT', 'connected')
+})
+
+socket.on('disconnect', () => {
+  console.log('Client disconnected')
+  store.commit('SOCKET_DISCONNECT', 'disconnected')
+})
+
+// const setTextHeightArea = (textHeight) => {
+//   lastTextHeight.value = textHeight
+// }
+
+const connectClient = () => {
+  if (!socket.connected) {
+    command.value = 'connecting...'
+    setTimeout(() => {
+      socket.connect()
+      command.value = null
+    }, 2000)
+  }
+}
+
+const disconnectClient = () => {
+  if (socket.connected) {
+    socket.disconnect()
+    console.log('disconnect action')
+  }
+}
+
+const createListener = () => {
+  socket.on('chat_message', (data) => {
+    console.log('SCREEN TEXT VALUE: ', screenText.value)
+    store.commit('SOCKET_CHAT_MESSAGE', data)
+  })
+}
+
+const rememberCommand = (e) => {
+  if (cursor.value === 0 && commandHistory.value.length === 1) {
+    command.value = commandHistory.value[0]
+    return
+  }
+  if (e.keyCode === 38) {
+    if (cursor.value > 0) {
+      cursor.value--
+    }
+    command.value = commandHistory.value[cursor.value]
+  } else if (e.keyCode === 40 && commandHistory.value.length > 0) {
+    if (cursor.value < commandHistory.value.length - 1) {
+      cursor.value++
+    }
+    command.value = commandHistory.value[cursor.value]
+  }
+}
+
+const sendBySocket = (cmd) => {
+  let options = cmd.replace('  ', ' ').split(' ')
+  socket.emit('chat_message', options)
+  store.dispatch('saveHistoryData', `\r\n${cmd}`)
+  lastCommand.value = cmd
+  command.value = null
+  countCommands.value += countCommands.value
+  calculateTextHeight()
+}
+
+const sendCommand = (e) => {
+  if (e.keyCode === 13) {
+    if (store.state.socket.isConnected) {
+      screenText.value = screenData.value.value
+      if (command.value === 'clear') {
+        store.dispatch('deleteHistoryData')
+        command.value = null
+        store.dispatch('saveHistoryData', '')
+        screenText.value.value = ''
+        return
+      }
+      commandHistory.value.push(command.value)
+      if (!proceed(command.value)) {
+        return
+      }
+      sendBySocket(command.value)
+    } else {
+      alert('Not connected')
+    }
+  }
+}
+
+const getSocketData = () => {
+  lastResponse.value = store.getters.getSocketData
+}
+
+const proceed = (cmd) => {
+  if (lastCommand.value && lastCommand.value === 'sspe list') {
+    const pattern = new RegExp(`(?<=${command.value}:\\s)(.*?).*`, 'g')
+    command.value = `sspe select --path ${lastResponse.value.match(pattern)}`
+    if (command.value.includes('CANCEL')) {
+      store.dispatch('saveHistoryData', `\r\nThe action was canceled!`)
+      command.value = ''
+      lastCommand.value = ''
+      return false
+    } else if (cmd.includes('sspe ml --iter')) {
+      store.dispatch('saveHistoryData', `\r\nDo you want to run the network training? y/n`)
+      return true
+    }
+    return true
+  } else if (lastCommand.value && lastCommand.value.includes('sspe ml --iter')) {
+    if (cmd.toLowerCase() === 'y') {
+      command.value = lastCommand.value
+    } else {
+      store.dispatch('saveHistoryData', `\r\nOkay, don't panic, nothing's gonna happen.`)
+    }
+  }
+  return true
+}
+
+const calculateTextHeight = () => {
+  // console.log("Scroll top b: ", screenText.value.scrollTop, " - ", screenText.value.scrollHeight);
+  // screenText.value.scrollTop = screenText.value.scrollHeight + screenText.value.offsetHeight;
+  // console.log("Scroll top a: ", screenText.value.scrollTop, " - ", screenText.value.scrollHeight);
+  // lastTextHeight.value = screenText.value.scrollHeight;
+}
+
+const getHistoryData = computed(() => {
+  getSocketData()
+  return store.getters.getHistoryData
+})
+</script>
+
 <template>
-  <div id="terminal">
+  <div id="terminal" ref="terminal">
     <div class="terminal-window">
       <div class="terminal-bar">
         <div class="text-left">
           <span>Console</span>
-          <span v-if="$store.state.socket.isConnected">✅</span>
-          <span v-if="!$store.state.socket.isConnected">❌</span>
+          <span v-if="store.state.socket.isConnected">✅</span>
+          <span v-if="!store.state.socket.isConnected">❌</span>
         </div>
       </div>
       <div class="terminal-body">
@@ -20,6 +180,7 @@
         />
         <textarea
           id="screenData"
+          ref="screenData"
           disabled="true"
           class="console text-input"
           readonly="true"
@@ -29,179 +190,25 @@
         <div>
           <button
             class="connect pulse"
-            v-on:click="connectClient"
-            :disabled="$store.state.socket.isConnected"
-          >Connect</button>
+            @click="connectClient"
+            :disabled="store.state.socket.isConnected"
+          >
+            Connect
+          </button>
           <button
             class="disconnect pulse"
-            v-on:click="disconnectClient"
-            :disabled="!$store.state.socket.isConnected"
-          >Disconnect</button>
+            @click="disconnectClient"
+            :disabled="!store.state.socket.isConnected"
+          >
+            Disconnect
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-
-export default {
-  name: "InterfaceCLI",
-  data() {
-    return {
-      command: null,
-      lastResponse: "",
-      commandHistory: [],
-      cursor: 0,
-      lastCommand: null,
-      countCommands: 0,
-    };
-  },
-  props: {},
-  sockets: {
-    connect() {
-      console.log("Socket connected");
-      this.createListener();
-    },
-    customEmit(val) {
-      console.log("Emit: ", val);
-    },
-    disconnect() {
-      console.log("Socket disconnected");
-    }
-  },
-  methods: {
-    setTextHeightArea: function(textHeight) {
-      this.lastTextHeight = textHeight;
-    },
-    connectClient: function() {
-      if (this.$socket.client.disconnected) {
-        this.command = "connecting...";
-        setTimeout(() => {
-          this.$socket.client.connect();
-          this.command = null;
-        }, 2000);
-      }
-    },
-    disconnectClient: function() {
-      if (this.$socket.client.connected) {
-        this.$socket.client.disconnect();
-        console.log("diconnect action");
-      }
-    },
-    createListener: function() {
-      this.$options.sockets.onmessage = data => {
-        console.log("Listened: ", data);
-      };
-    },
-    rememberCommand: function(e) {
-      if (this.cursor === 0 && this.commandHistory.length === 1) {
-        this.command = this.commandHistory[0];
-        return;
-      }
-      if (e.keyCode === 38) {
-        if (this.cursor > 0) {
-          this.cursor--;
-        }
-        this.command = this.commandHistory[this.cursor];
-      } else if (e.keyCode === 40 && this.commandHistory.length > 0) {
-        if (this.cursor < this.commandHistory.length - 1) {
-          this.cursor++;
-        }
-        this.command = this.commandHistory[this.cursor];
-      }
-    },
-    sendBySocket: function(command) {
-      let options = command.replace("  ", " ");
-      options = options.split(" ");
-      this.$socket.client.emit("chat_message", options);
-      this.$store.dispatch("saveHistoryData", `\r\n${command}`);
-      this.lastCommand = command;
-      this.command = null;
-      this.countCommands += this.countCommands;
-      this.calculateTextHeight();
-    },
-    sendCommand: function(e) {
-      if (e.keyCode === 13) {
-        if (this.$store.state.socket.isConnected) {
-          this.screenText = this.$refs.screenData;
-          if (this.command === "clear") {
-            this.$store.dispatch("deleteHistoryData");
-            this.command = null;
-            this.$store.dispatch("saveHistoryData", "");
-            this.screenText.value = "";
-            return;
-          }
-          this.commandHistory.push(this.command);
-          if (!this.continue(this.command)) {
-            return;
-          }
-          this.sendBySocket(this.command);
-        } else {
-          alert("Not connected");
-        }
-      }
-    },
-    getSocketData: function() {
-      this.lastResponse = this.$store.getters.getSocketData;
-    },
-    continue: function(command) {
-      if (this.lastCommand && this.lastCommand === "sspe list") {
-        const pattern = new RegExp(`(?<=${this.command}:\\s)(.*?).*`, "g");
-        this.command = `sspe select --path ${this.lastResponse.match(pattern)}`;
-        if (this.command.includes("CANCEL")) {
-          this.$store.dispatch(
-            "saveHistoryData",
-            `\r\nThe action was canceled!`
-          );
-          this.command = "";
-          this.lastCommand = "";
-          return false;
-        } else if (command.includes("sspe ml --iter")) {
-          this.$store.dispatch(
-            "saveHistoryData",
-            `\r\n¿You want to run the network training? y/n`
-          );
-          return true;
-        }
-        return true;
-      } else if (
-        this.lastCommand &&
-        this.lastCommand.includes("sspe ml --iter")
-      ) {
-        if (command.toLowerCase() === "y") {
-          this.command = this.lastCommand;
-        } else {
-          this.$store.dispatch(
-            "saveHistoryData",
-            `\r\nOkay, don´t panic, nothing´s gonna happen.`
-          );
-        }
-      }
-      return true;
-    },
-    calculateTextHeight: function() {
-      // console.log("Scroll top b: ", this.$refs.screenData.scrollTop, " - ", this.$refs.screenData.scrollHeight);
-      // this.$refs.screenData.scrollTop = this.$refs.screenData.scrollHeight + this.$refs.screenData.offsetHeight;
-      // console.log("Scroll top a: ", this.$refs.screenData.scrollTop, " - ", this.$refs.screenData.scrollHeight);
-      // this.lastTextHeight = this.$refs.screenData.scrollHeight;
-    }
-  },
-  mounted() {
-    this.connectClient();
-    // this.screenText = this.$refs.screenData;
-    // this.lastTextHeight = this.screenText.scrollHeight;
-  },
-  computed: {
-    getHistoryData() {
-      this.getSocketData();
-      return this.$store.getters.getHistoryData;
-    }
-  }
-};
-</script>
-
-<style scoped >
+<style scoped>
 #terminal {
   min-height: 55vh;
   max-width: 60%;

@@ -1,5 +1,8 @@
+<script setup>
+</script>
+
 <template>
-  <footer calls="container-fluid text-center">
+  <footer class="container-fluid text-center">
     By Vickodev |
     <a href="https://github.com/harvic3/sspe-project" target="_blank">project</a> |
     <a href="https://github.com/harvic3/directory" target="_blank">github</a> |
@@ -7,13 +10,7 @@
   </footer>
 </template>
 
-<script>
-export default {
-  name: "Footer"
-};
-</script>
-
-<style scoped >
+<style scoped>
 footer a {
   color: rgb(99, 217, 253);
 }
@@ -22,3 +19,4 @@ footer a:hover {
   color: rgb(0, 195, 255);
 }
 </style>
+
